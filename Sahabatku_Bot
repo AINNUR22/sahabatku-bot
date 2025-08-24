@@ -1,0 +1,21 @@
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/AINNUR22/telegram-bot.git
+git push -u origin main
+git add requirements.txt
+git commit -m "fix: correct requirements.txt filename"
+git push
+git add requirements.txt
+git commit -m "Fix requirements.txt"
+git push origin main
+git add requirements.txt
+git commit -m "Fix requirements.txt"
+git push origin main
+git add requirements.txt
+git commit -m "Fix: add correct requirements.txt"
+git push
+git add .
+git commit -m "Fix requirements and Procfile"
+git push origin main
