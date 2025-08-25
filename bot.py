@@ -1,15 +1,19 @@
 import os
 import logging
 import csv
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
-
-# --- Logging setup (helps debug on Render) ---
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters
 )
+from dotenv import load_dotenv
 
 # --- Load Environment Variables ---
+load_dotenv()
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
 COUNSELOR_GROUP_ID = int(os.environ.get("COUNSELOR_GROUP_ID", "0"))
@@ -20,6 +24,11 @@ if GROUP_ID == 0:
     raise RuntimeError("❌ Missing or invalid GROUP_ID env var")
 if COUNSELOR_GROUP_ID == 0:
     raise RuntimeError("❌ Missing or invalid COUNSELOR_GROUP_ID env var")
+
+# --- Logging setup (helps debug on Render) ---
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 
 # === Helper: Save student log in CSV ===
 def save_user_log(user_id, first_name, last_name, username, category, message):
@@ -77,6 +86,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === Handle student messages ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if "category" not in context.user_data:
+        return  # Ignore messages before category selection
+
     user = update.effective_user
     message = update.message.text
     category = context.user_data.get("category", "Tidak Dipilih")
@@ -94,6 +106,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await context.bot.send_message(chat_id=GROUP_ID, text=forward_text, parse_mode="Markdown")
     await update.message.reply_text("🤝 Sahabatku: ✅ Mesej anda telah diterima dan disimpan dengan selamat.")
+    context.user_data.clear()
 
 # === PRS Report Command ===
 async def prs_report_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -137,11 +150,11 @@ async def prs_problem_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # === Handle PRS report messages ===
 async def handle_prs_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    message_text = update.message.text
-
     if "prs_problem" not in context.user_data:
         return  # Ignore unrelated messages
+
+    user = update.effective_user
+    message_text = update.message.text
 
     if "prs_stage" not in context.user_data:
         # First stage: Content
@@ -166,35 +179,4 @@ async def handle_prs_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Nama PRS: {prs_name}\n\n"
             f"👤 *Maklumat Penghantar (Rahsia untuk counselor)*\n"
             f"ID: {user.id}\n"
-            f"Nama Telegram: {user.first_name} {user.last_name or ''}\n"
-            f"Username: @{user.username if user.username else 'None'}"
-        )
-        await context.bot.send_message(chat_id=COUNSELOR_GROUP_ID, text=forward_text, parse_mode="Markdown")
-
-        # Confirm to PRS
-        await update.message.reply_text("✅ Laporan anda telah diterima dan disimpan dengan selamat.")
-
-        # Clear user_data
-        context.user_data.clear()
-
-# === Main Function ===
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-
-    # Student handlers
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # PRS handlers
-    app.add_handler(CommandHandler("prs_report", prs_report_start))
-    app.add_handler(CallbackQueryHandler(
-        prs_problem_choice,
-        pattern="Masalah|Isu Disiplin|SELF-HARM|Masalah Akademik|Penyalahgunaan Dadah|Masalah Sosial|Lain-lain"
-    ))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prs_report))
-
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+            f"Nama Telegram: {user.first_name} {user.last_name
